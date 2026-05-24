@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   DESIGN TOKENS — all semantic values live here as CSS custom properties.
+   Components reference tokens (var(--...)); never hard-code hex values.
+   ============================================================================ */
+
+:root {
+  /* ── Backgrounds (dark → light) ─────────────────────────────────────────── */
+  --bg-base:          #17140F;   /* page canvas — warm charcoal */
+  --bg-sidebar:       #131009;   /* sidebar — marginally darker for depth */
+  --bg-surface:       #1E1A14;   /* default card / panel */
+  --bg-surface-raised:#252018;   /* elevated / hero cards */
+  --bg-hover:         #2C2720;   /* list item hover state */
+  --bg-active:        #332E26;   /* active / pressed state */
+
+  /* ── Borders ─────────────────────────────────────────────────────────────── */
+  --border-subtle:    #2C2720;   /* barely-there structural lines */
+  --border-default:   #3A3328;   /* standard card border */
+  --border-strong:    #4A4238;   /* hover / focus border */
+
+  /* ── Text ────────────────────────────────────────────────────────────────── */
+  --text-primary:     #F0EBE3;   /* main readable text          contrast 15.5:1 ✅ */
+  --text-secondary:   #C4B8AA;   /* labels, sublabels           contrast  9.4:1 ✅ */
+  --text-muted:       #8D8278;   /* timestamps, decorative meta contrast  4.9:1 ✅ */
+
+  /* ── Brand palette ───────────────────────────────────────────────────────── */
+  /* Tangerine Dream — reserved for the 1-2 most important hero metrics ONLY */
+  --accent:           #F49D6E;   /* Tangerine Dream             contrast  8.7:1 ✅ */
+  /* Soft Apricot — secondary emphasis, hover reveals, warm highlights */
+  --accent-soft:      #F5D6BA;   /* Soft Apricot                contrast 13.3:1 ✅ */
+  /* Ash Grey — "healthy / positive" status indicators */
+  --accent-sage:      #ACC3A6;   /* Ash Grey                    contrast  9.7:1 ✅ */
+
+  /* ── Semantic status ─────────────────────────────────────────────────────── */
+  --color-positive:   #ACC3A6;   /* success, healthy, on-track */
+  --color-warning:    #F5D6BA;   /* needs attention */
+  --color-danger:     #C47A7A;   /* error, blocked, overdue */
+  --color-info:       #8AABBA;   /* neutral informational */
+
+  /* ── Typography ──────────────────────────────────────────────────────────── */
+  --font-display:     'Playfair Display', Georgia, serif;
+  --font-body:        'Inter', system-ui, sans-serif;
+
+  /* Scale */
+  --text-xs:   0.6875rem;  /* 11px — chip labels, legal-size meta */
+  --text-sm:   0.8125rem;  /* 13px — secondary labels */
+  --text-base: 0.9375rem;  /* 15px — body copy */
+  --text-md:   1.0625rem;  /* 17px — card titles */
+  --text-lg:   1.25rem;    /* 20px — section headers */
+  --text-xl:   1.625rem;   /* 26px — sub-hero numbers */
+  --text-hero: 2.75rem;    /* 44px — hero KPI numbers (Playfair) */
+
+  /* Weights */
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* Line heights */
+  --leading-tight:  1.2;
+  --leading-snug:   1.375;
+  --leading-normal: 1.5;
+
+  /* ── Shadows ─────────────────────────────────────────────────────────────── */
+  --shadow-card:   0 1px 2px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.25);
+  --shadow-raised: 0 2px 8px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.3);
+  --shadow-hover:  0 4px 16px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.4);
+
+  /* ── Radii ───────────────────────────────────────────────────────────────── */
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ── Motion ──────────────────────────────────────────────────────────────── */
+  --duration-fast:   150ms;
+  --duration-normal: 220ms;
+  --duration-slow:   350ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* snappy ease-out-expo */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================================
+   BASE LAYER
+   ============================================================================ */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+  }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+  }
+
+  /* Headings use the display font */
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    line-height: var(--leading-tight);
+    color: var(--text-primary);
+  }
+
+  /* Respect reduced-motion preference globally */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  ::selection {
+    background-color: #3A3328;
+    color: var(--accent-soft);
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-strong);
+  }
+}
+
+/* ============================================================================
+   ANIMATION KEYFRAMES — defined globally, applied in components
+   ============================================================================ */
+
+@layer utilities {
+
+  /* ── Entrance animations ─────────────────────────────────────────────────── */
+
+  @keyframes fade-slide-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Accent stripe: scales up from the top after the parent card appears */
+  @keyframes accent-line-in {
+    from { transform: scaleY(0); transform-origin: top; opacity: 0; }
+    to   { transform: scaleY(1); transform-origin: top; opacity: 1; }
+  }
+
+  /* Badge breathe: draws attention without flashing */
+  @keyframes badge-breathe {
+    0%, 100% { opacity: 1;    transform: scale(1); }
+    50%       { opacity: 0.72; transform: scale(0.93); }
+  }
+
+  /* ── Utility classes ─────────────────────────────────────────────────────── */
+
+  .animate-fade-slide-up {
+    animation: fade-slide-up var(--duration-slow) var(--ease-out) both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in var(--duration-normal) var(--ease-out) both;
+  }
+
+  /* Fires after the parent card's 350ms entrance finishes */
+  .animate-accent-line {
+    animation: accent-line-in 380ms var(--ease-out) both;
+    animation-delay: 280ms;
+  }
+
+  /* Starts after page entrance settles */
+  .animate-badge-breathe {
+    animation: badge-breathe 2.4s ease-in-out infinite;
+    animation-delay: 900ms;
+  }
+
+  /* ── Section stagger delays ──────────────────────────────────────────────── */
+  .stagger-1 { animation-delay: 0ms; }
+  .stagger-2 { animation-delay: 60ms; }
+  .stagger-3 { animation-delay: 120ms; }
+  .stagger-4 { animation-delay: 180ms; }
+  .stagger-5 { animation-delay: 240ms; }
+  .stagger-6 { animation-delay: 300ms; }
+
+  /* ── Focus ring — uses accent color for keyboard navigation ─────────────── */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}

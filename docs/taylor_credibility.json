@@ -1,0 +1,275 @@
+{
+  "_metadata": {
+    "owner": "Taylor A. Humphrey",
+    "business_name": "What's in a Baby Name",
+    "tagline": "Where Heritage Meets Identity",
+    "version": "2026.05.22",
+    "last_verified": "2026-05-22",
+    "data_provenance": "Compiled from publicly available press, the brand website (whatsinababyname.com), and Taylor's verified social profiles. The pitch agent is FORBIDDEN from claiming anything not in this file.",
+    "verification_protocol": "Audience numbers and active partner lists should be re-verified monthly. When in doubt, the pitch should omit specific numbers and use qualitative claims (e.g. 'a substantial engaged audience' rather than a stale follower count).",
+    "needs_taylor_confirmation": [
+      "Current IG follower count (last public read: 32K, likely higher in 2026)",
+      "Current TikTok follower count (last public read: 46K in 2022, likely materially higher)",
+      "Total client/baby count to date (public reports: 500+ as of late 2025, may be higher)",
+      "Current active brand partners and any exclusivity windows",
+      "Current pricing tiers if she wants to reference them in pitches"
+    ]
+  },
+
+  "person": {
+    "full_name": "Taylor A. Humphrey",
+    "profession": "Professional Baby Name Consultant",
+    "based_in": "San Francisco, California",
+    "education": "NYU graduate",
+    "prior_careers": ["Matchmaker", "Event Planner", "Fundraiser", "Aspiring Screenwriter"],
+    "business_founded": 2015,
+    "approximate_age_range": "late 30s",
+    "doula_note": "Doula training and Reiki are listed publicly but she is NOT currently practicing as a doula. Aspirational direction. Do not reference doula credentials in pitches."
+  },
+
+  "business": {
+    "name": "What's in a Baby Name",
+    "website": "https://www.whatsinababyname.com",
+    "positioning": "A boutique consultancy offering bespoke naming services worldwide — holistic, intuitive, identity-rooted.",
+    "service_tiers_public": [
+      {
+        "name": "Personalized Recommendations",
+        "approx_price_usd": 200,
+        "description": "Entry-level personalized name list with meanings, origins, popularity, and spellings"
+      },
+      {
+        "name": "One-on-One Consultation",
+        "approx_price_usd": 1500,
+        "description": "Phone call consultation, the tier that went viral via the New Yorker piece"
+      },
+      {
+        "name": "Concierge Naming",
+        "approx_price_usd": 30000,
+        "description": "Multi-month bespoke service including professional genealogist input and brand-manager-level naming strategy"
+      }
+    ],
+    "service_tiers_note": "These are from public press as of late 2025. Confirm with Taylor before quoting in any pitch.",
+    "babies_named_to_date": {
+      "approximate_count": 500,
+      "source": "Public press, late 2025",
+      "caveat": "Number is approximate and likely higher now"
+    },
+    "geographic_reach": "Global — clients worldwide, with notable concentration in San Francisco Bay Area and New York",
+    "doula_service_areas": ["California", "New York"]
+  },
+
+  "audience": {
+    "instagram": {
+      "handle": "@whatsinababyname",
+      "url": "https://instagram.com/whatsinababyname",
+      "follower_count_last_known": 32000,
+      "follower_count_as_of": "2026-05-22",
+      "bio_self_description": "I help you name your Baby, Brand, or Business — Baby Name Consultant",
+      "press_self_credits_in_bio": ["@sfchronicle", "@kpixtv", "@newyorkermag", "@accesshollywood"],
+      "verify_before_using_number": true
+    },
+    "tiktok": {
+      "handle": "@whatsinababynamedoula",
+      "url": "https://www.tiktok.com/@whatsinababynamedoula",
+      "follower_count_last_known": 46000,
+      "follower_count_as_of": "2022 — STALE, likely much higher now",
+      "verify_before_using_number": true,
+      "content_style": "Hyper-specific name suggestions in response to viewer prompts ('boy names to go with Lydia', 'sibling names for baby Abel', etc.)"
+    },
+    "x_twitter": {
+      "handle": "@babynamedoula",
+      "url": "https://x.com/babynamedoula",
+      "post_count_last_known": 6847,
+      "post_count_as_of": "2026",
+      "verify_before_using_number": false
+    },
+    "pinterest": {
+      "url": "https://www.pinterest.com/taylorahumphrey/whats-in-a-baby-name"
+    },
+    "facebook": {
+      "url": "https://www.facebook.com/WhatsInABabyName/"
+    },
+    "linkedin": {
+      "url": "https://www.linkedin.com/in/taylor-a-humphrey-34189725/"
+    },
+    "audience_demographic_summary": "Expecting and new parents, predominantly women 25-40, US-centric with substantial UK and AU reach. Audience skews toward affluent, educated parents who are thoughtful about identity, branding, and meaning."
+  },
+
+  "press_verified": [
+    {
+      "outlet": "The New Yorker",
+      "title": "For Sale: Baby Names, Lightly Used",
+      "url": "https://www.newyorker.com/magazine/2022/04/18/for-sale-baby-names-lightly-used",
+      "published": "2022-04-18",
+      "type": "feature_profile",
+      "significance": "The original viral moment. Established her publicly as the leading professional baby namer. Drove ongoing press cycle."
+    },
+    {
+      "outlet": "San Francisco Chronicle",
+      "title": "Meet the San Francisco woman who charges $30,000 to name your baby",
+      "url": "https://www.sfchronicle.com/sf/article/baby-name-taylor-humphrey-21031547.php",
+      "published": "2025-09",
+      "type": "feature_profile",
+      "significance": "Updated profile establishing her as the premier high-end baby naming consultant"
+    },
+    {
+      "outlet": "New York Post",
+      "title": "Baby name consultant Taylor Humphrey charges $30K to help new parents choose",
+      "url": "https://nypost.com/2025/09/29/lifestyle/baby-name-consultant-taylor-humphrey-charges-30k-to-help-new-parents-choose/",
+      "published": "2025-09-29",
+      "type": "feature"
+    },
+    {
+      "outlet": "NZ Herald",
+      "title": "Baby name consultant Taylor Humphrey charges up to $50k to help parents pick names",
+      "url": "https://www.nzherald.co.nz/world/baby-name-consultant-taylor-humphrey-charges-up-to-50k-to-help-parents-pick-names/UQRSZFAJKBGE7AM5RLR27A46IE/",
+      "published": "2025-10",
+      "type": "feature"
+    },
+    {
+      "outlet": "Cosmopolitan",
+      "type": "feature",
+      "verification": "Listed on her brand homepage as 'Featured In'"
+    },
+    {
+      "outlet": "The Guardian",
+      "type": "feature",
+      "verification": "Listed on her brand homepage as 'Featured In'"
+    },
+    {
+      "outlet": "People",
+      "type": "feature",
+      "verification": "Listed on her brand homepage as 'Featured In'"
+    },
+    {
+      "outlet": "The Independent",
+      "type": "expert_quote",
+      "context": "Quoted as a baby naming consultant on top baby naming trends for 2025, including the rise of family-surname-as-first-name and the Bieber-effect on the name Jack"
+    },
+    {
+      "outlet": "Yahoo Lifestyle",
+      "type": "feature",
+      "url": "https://www.yahoo.com/lifestyle/articles/meet-san-francisco-woman-charges-110022305.html"
+    },
+    {
+      "outlet": "YourTango",
+      "type": "feature",
+      "url": "https://www.yourtango.com/self/professional-baby-namer-taylor-humphrey-charges-parents-30k"
+    },
+    {
+      "outlet": "Dexerto",
+      "type": "feature",
+      "url": "https://www.dexerto.com/entertainment/san-francisco-woman-charges-rich-couples-30k-to-name-their-babies-3259660/"
+    },
+    {
+      "outlet": "Hollywood Unlocked",
+      "type": "feature",
+      "url": "https://hollywoodunlocked.com/woman-charges-10k-per-client-as-a-professional-baby-namer/"
+    },
+    {
+      "outlet": "Narcity",
+      "type": "feature"
+    },
+    {
+      "outlet": "Ripley's Believe It or Not",
+      "type": "feature",
+      "published": "2022-04"
+    }
+  ],
+
+  "tv_and_video_appearances_verified": [
+    {
+      "outlet": "The Tamron Hall Show",
+      "type": "tv_appearance",
+      "url": "https://www.youtube.com/watch?v=O-ga6IJMoms",
+      "verification": "Linked from her brand homepage 'As Seen On'"
+    },
+    {
+      "outlet": "CBC — The Last Walt",
+      "type": "tv_documentary",
+      "url": "https://www.youtube.com/watch?v=bDZqiOxkYIk",
+      "verification": "Linked from her brand homepage 'As Seen On'"
+    },
+    {
+      "outlet": "KTLA Morning News",
+      "type": "tv_appearance",
+      "url": "https://ktla.com/morning-news/baby-consultant-gives-jessica-some-baby-name-ideas/",
+      "verification": "Linked from her brand homepage 'As Seen On'"
+    },
+    {
+      "outlet": "KPIX TV (CBS Bay Area)",
+      "type": "tv_appearance",
+      "verification": "Self-credited in her IG bio"
+    },
+    {
+      "outlet": "Access Hollywood",
+      "type": "tv_appearance",
+      "verification": "Self-credited in her IG bio"
+    },
+    {
+      "outlet": "YouTube interview",
+      "url": "https://www.youtube.com/watch?v=djbA8CB1NmA",
+      "type": "interview"
+    }
+  ],
+
+  "thought_leadership_themes": [
+    "Family surnames as first names — modern way to honor passed loved ones (e.g., Taylor, Lawson, Sutton, Rooney, Murphy, Rhodes, Collins as gender-neutral first names)",
+    "The Bieber effect — celebrity naming choices driving Social Security ranking shifts (e.g., Jack rising after Jack Blues Bieber)",
+    "Naming as identity branding — the convergence of personal name strategy and brand strategy",
+    "Heritage meets identity — honoring lineage while creating distinctive identity",
+    "Name remorse and naming anxiety as legitimate emotional experiences requiring guidance",
+    "The growing market for bespoke naming services in tech-affluent cities (SF Bay Area as a hub)"
+  ],
+
+  "voice_signature_phrases": [
+    "The Name you're given is your destiny. The Name you choose is your legacy.",
+    "I come up with baby names for a living.",
+    "Where Heritage Meets Identity",
+    "I help you name your Baby, Brand, or Business",
+    "There are no mistakes in baby naming. That's my mantra. What if your child is meant to change the meaning of the name they have?",
+    "If you look at the most popular baby names, it's such a telltale sign of our cultural values and our aspirations.",
+    "There's a lot more to this job than people realize."
+  ],
+
+  "verified_client_story_patterns": [
+    "Helped a single gay father expecting via surrogacy brainstorm names",
+    "Helped an older couple find a name for their fourth boy after running out of ideas",
+    "Helped a multicultural family find a name bridging different ethnic backgrounds",
+    "Talked a mother out of changing her daughter's name (Isla) after she worried about mispronunciation",
+    "Helped name 500+ babies across her career",
+    "Was named herself after 1980s soap opera actress Taylor Miller"
+  ],
+
+  "what_makes_her_a_strong_brand_partner": [
+    "Top of the category — frequently described in press as THE professional baby namer",
+    "Active across IG, TikTok, X, Pinterest — multi-platform reach",
+    "Affluent audience (her clients pay up to $30K — her followers self-select for premium consideration)",
+    "Earned media keeps cycling — she gets new press at least quarterly without paying for placement",
+    "Naming-as-branding angle uniquely positions her to speak to brand-side audiences, not just consumer-side",
+    "TV-ready (Tamron Hall, KTLA, KPIX) — comfortable on camera, useful for campaign video work",
+    "Bay Area + NYC presence covers two top media markets"
+  ],
+
+  "what_to_NEVER_claim_in_pitches": [
+    "Any follower count without re-verifying first — both IG and TikTok numbers in this file may be stale",
+    "Specific revenue figures (press has cited $150K-$250K, but Taylor has declined to confirm current numbers — do NOT quote in pitches)",
+    "Any brand partnership Taylor hasn't explicitly confirmed",
+    "Any press feature not in this file",
+    "Engagement rates, audience demographics percentages, or campaign performance metrics that aren't verified via Modash or her own analytics"
+  ],
+
+  "current_brand_partners": {
+    "note": "As of 2026-05-22, Taylor has no current paid brand partnerships and no active exclusivity agreements. This means the conflict-detection logic has nothing to block against — every otherwise-qualifying brand is open. This will change as deals close; the system must update this array whenever a new partnership goes live.",
+    "partners": []
+  },
+
+  "exclusivity_windows": {
+    "note": "No active exclusivity windows. Will populate as deals close with exclusivity clauses.",
+    "windows": []
+  },
+
+  "doula_business_status": {
+    "note": "Doula is listed on her website and in some press, but she does NOT currently take doula clients. This is an aspirational direction she wants to grow into. The pitch agent should NOT lead with or reference doula credentials in brand outreach until that work is actually active. Reference birth/pregnancy expertise via her baby naming consults instead, which is where her actual current expertise lives."
+  }
+}

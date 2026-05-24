@@ -1,0 +1,100 @@
+{
+  "name": "TaylorReach — Daily Scanner",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "8am Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DASHBOARD_URL }}/api/scan",
+        "authentication": "none",
+        "options": {
+          "timeout": 300000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          }
+        }
+      },
+      "id": "run-scan",
+      "name": "Run scanner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-ok",
+      "name": "Scan succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "content": "=## TaylorReach Scanner\n\n✅ Scan complete in {{ $('Run scanner').item.json.elapsed_seconds }}s\n\n- Raw signals: {{ $('Run scanner').item.json.raw_signals }}\n- New signals: {{ $('Run scanner').item.json.new_signals }}\n- Brands created: {{ $('Run scanner').item.json.brands_created }}\n- Brands enriched: {{ $('Run scanner').item.json.brands_enriched }}\n- Drafts created: {{ $('Run scanner').item.json.drafts_created }}\n\nCheck the dashboard: {{ $env.DASHBOARD_URL }}/signals"
+      },
+      "id": "success-note",
+      "name": "Log success",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 220]
+    },
+    {
+      "parameters": {
+        "content": "=## TaylorReach Scanner FAILED\n\nError: {{ $('Run scanner').item.json.error }}"
+      },
+      "id": "fail-note",
+      "name": "Log failure",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 400]
+    }
+  ],
+  "connections": {
+    "8am Mon-Fri": {
+      "main": [[{ "node": "Run scanner", "type": "main", "index": 0 }]]
+    },
+    "Run scanner": {
+      "main": [[{ "node": "Scan succeeded?", "type": "main", "index": 0 }]]
+    },
+    "Scan succeeded?": {
+      "main": [
+        [{ "node": "Log success", "type": "main", "index": 0 }],
+        [{ "node": "Log failure", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "notes": "Runs Mon-Fri at 8am. Set DASHBOARD_URL env var in n8n to your Next.js dashboard URL (e.g. http://localhost:3000 for local or your deployed URL)."
+  }
+}

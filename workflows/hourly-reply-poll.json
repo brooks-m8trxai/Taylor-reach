@@ -1,0 +1,94 @@
+{
+  "name": "TaylorReach — Hourly Reply Poll",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7-19 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Every hour 7am-7pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DASHBOARD_URL }}/api/reply-poll",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "poll-replies",
+      "name": "Poll Gmail replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.newReplies }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "has-replies",
+      "name": "New replies found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "content": "=## New replies in TaylorReach inbox\n\n{{ $('Poll Gmail replies').item.json.newReplies }} new replies\n{{ $('Poll Gmail replies').item.json.warmReplies }} warm 🔥\n{{ $('Poll Gmail replies').item.json.optOuts }} opt-outs\n\nReview now: {{ $env.DASHBOARD_URL }}/inbox"
+      },
+      "id": "log-replies",
+      "name": "Log new replies",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 220]
+    },
+    {
+      "parameters": {},
+      "id": "no-replies",
+      "name": "No new replies",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 400]
+    }
+  ],
+  "connections": {
+    "Every hour 7am-7pm": {
+      "main": [[{ "node": "Poll Gmail replies", "type": "main", "index": 0 }]]
+    },
+    "Poll Gmail replies": {
+      "main": [[{ "node": "New replies found?", "type": "main", "index": 0 }]]
+    },
+    "New replies found?": {
+      "main": [
+        [{ "node": "Log new replies", "type": "main", "index": 0 }],
+        [{ "node": "No new replies", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "notes": "Polls Gmail every hour between 7am-7pm. Set DASHBOARD_URL env var in n8n. Requires GMAIL_REFRESH_TOKEN to be set in the dashboard .env.local."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@taylor-reach/enrichment",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "playwright": "^1.48.0",
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@taylor-reach/db": "workspace:*",
+    "@taylor-reach/integrations": "workspace:*"
+  }
+}

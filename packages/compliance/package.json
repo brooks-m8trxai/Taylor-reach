@@ -1,0 +1,12 @@
+{
+  "name": "@taylor-reach/compliance",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/gate.ts"
+  },
+  "main": "./src/gate.ts",
+  "types": "./src/gate.ts",
+  "dependencies": {
+    "@taylor-reach/db": "workspace:*"
+  }
+}

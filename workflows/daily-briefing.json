@@ -1,0 +1,62 @@
+{
+  "name": "TaylorReach — Daily Briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "7am Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.DASHBOARD_URL }}/api/briefing",
+        "authentication": "none",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-briefing",
+      "name": "Fetch daily briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "content": "=## Good morning, Taylor 🌅\n\n**Yesterday**\n- {{ $json.sendsYesterday }} emails sent\n- {{ $json.repliesYesterday }} replies received\n\n**Warm replies needing response**: {{ $json.unresolvedWarm }}\n\n**Top pipeline value**: ${{ $json.pipelineValue?.toLocaleString?.() ?? $json.pipelineValue }}\n\n**Drafts awaiting approval**: {{ $json.draftsAwaiting }}\n\n**Today's priority**: {{ $json.priorityTask }}\n\nOpen dashboard: {{ $env.DASHBOARD_URL }}"
+      },
+      "id": "briefing-note",
+      "name": "Log briefing",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "7am Mon-Fri": {
+      "main": [[{ "node": "Fetch daily briefing", "type": "main", "index": 0 }]]
+    },
+    "Fetch daily briefing": {
+      "main": [[{ "node": "Log briefing", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "notes": "Generates Taylor's morning briefing Mon-Fri at 7am. Optionally wire 'Log briefing' to an email or Slack node to deliver it to Taylor directly. Requires /api/briefing endpoint (add if you want this wired)."
+  }
+}
