@@ -117,13 +117,13 @@ export async function sendEmail(params: SendParams): Promise<SendResult> {
     inReplyTo: inReplyToMessageId,
   })
 
-  const sendParams: Parameters<typeof gmail.users.messages.send>[0] = {
-    userId: 'me',
-    requestBody: { raw: encoded },
-  }
-  if (replyToThreadId) sendParams.requestBody!.threadId = replyToThreadId
+  const requestBody: { raw: string; threadId?: string } = { raw: encoded }
+  if (replyToThreadId) requestBody.threadId = replyToThreadId
 
-  const response = await gmail.users.messages.send(sendParams)
+  const response = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody,
+  })
   const messageId = response.data.id ?? ''
   const threadId = response.data.threadId ?? ''
 
