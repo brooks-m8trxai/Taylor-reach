@@ -17,7 +17,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata = {
-  title: 'TaylorReach',
+  title: "What's In A Baby Name",
   description: 'Brand partnership engine for Taylor Humphrey',
 }
 

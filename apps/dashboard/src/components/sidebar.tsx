@@ -36,10 +36,10 @@ export function Sidebar() {
       {/* ── Logo / wordmark ──────────────────────────────────────────────── */}
       <div className="px-5 pt-6 pb-5 border-b border-wire-subtle">
         <div className="font-display text-lg font-semibold text-ink tracking-tight leading-none">
-          TaylorReach
+          What's In A Baby Name
         </div>
         <div className="mt-1 text-2xs text-ink-muted uppercase tracking-widest">
-          Brand partnership engine
+          Brand Partnership Engine
         </div>
       </div>
 
