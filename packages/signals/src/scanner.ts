@@ -27,6 +27,12 @@ import { fetchSignals as fetchBrandLaunches } from './sources/brand_launches'
 import { fetchSignals as fetchFundedBrands } from './sources/funded_brands'
 import { fetchSignals as fetchRetailSignals } from './sources/retail_signals'
 import { fetchSignals as fetchSmallBrands } from './sources/small_brands'
+// ── Phase 1: Watchlist scanner ────────────────────────────────────────────────
+import { fetchSignals as fetchWatchlist } from './sources/watchlist_scanner'
+// ── Phase 5: Curated lists ────────────────────────────────────────────────────
+import { fetchSignals as fetchCuratedLists, CURATED_SOURCE_NAMES } from './sources/curated_lists'
+// ── Phase 6: Job / hiring signals ─────────────────────────────────────────────
+import { fetchSignals as fetchJobSignals } from './sources/job_signals'
 // ── Channel B: Content radar sources (Social Media Brain) ─────────────────────
 import { fetchSignals as fetchCelebBabies } from './sources/celebrity_babies'
 import { fetchSignals as fetchNameTrends } from './sources/name_trends'
@@ -221,6 +227,7 @@ type ExtractionPath =
   | { path: 'haiku_publisher_detected'; publisher: string }  // Haiku returned is_publisher_or_creator=true
   | { path: 'haiku' }
   | { path: 'haiku_with_fallback'; fallbackSource: FallbackSource }
+  | { path: 'known_brand'; discoverySource: string }  // watchlist / curated — bypasses Haiku
 
 function logSignal(
   index: number,
@@ -256,6 +263,9 @@ function logSignal(
       break
     case 'haiku_with_fallback':
       lines.push(`[scanner]   path:  haiku → brand empty → FALLBACK(${extractionPath.fallbackSource})`)
+      break
+    case 'known_brand':
+      lines.push(`[scanner]   path:  KNOWN_BRAND (${extractionPath.discoverySource}, skipped Haiku)`)
       break
   }
 
@@ -466,7 +476,7 @@ async function checkDedupe(
 // Policy: DROP if any hard-exclude pattern matches, or if no hard-include
 // criteria are met for non-publisher signals.
 
-// Hard-exclude keyword patterns — these categories are never a fit.
+// Hard-exclude keyword patterns — these categories are NEVER a fit.
 const OFF_NICHE_EXCLUDE: RegExp[] = [
   // Energy/protein/snack bars for adults
   /\blärabar|larabar|rxbar|clif\s*bar|kind\s*bar|quest\s*bar|protein\s*bar|energy\s*bar\b/i,
@@ -480,9 +490,23 @@ const OFF_NICHE_EXCLUDE: RegExp[] = [
   /\bhello\s*nation|hellonation\b/i,
   // School-age food marketing (Lunchables category)
   /\bschool\s*lunch|after.?school\s*snack\s*brand\b/i,
+  // Pets-only brands (no baby/child product line)
+  /\bdog\s*food|cat\s*food|pet\s*food|puppy\s*(food|brand|treat)|kitten\s*food|reptile\s*food|bird\s*food\b/i,
+  // General fitness / gym / wellness with no maternal angle
+  /\bgym\s*(chain|brand|equipment)|workout\s*brand|fitness\s*brand|crossfit|peloton\s*competitor|treadmill\s*brand\b/i,
+  // Real estate / mortgage (unless specifically for new families)
+  /\bmortgage\s*brand|home\s*loan\s*brand|real\s*estate\s*company\b/i,
+  // Adult fashion with zero maternity angle
+  /\bmenswear|men\'s\s*fashion|streetwear\s*brand|sneaker\s*brand|luxury\s*handbag\b/i,
+  // General household goods (non-baby)
+  /\bvacuum\s*brand|dishwasher\s*brand|lawn\s*mower\b/i,
+  // School-age / tween focus (no 0-3 product line)
+  /\btween\s*brand|back\s*to\s*school\s*brand|middle\s*school\s*fashion\b/i,
+  // Alcohol / tobacco
+  /\bwinery|brewery|distillery|craft\s*beer\s*brand|spirits\s*brand\b/i,
 ]
 
-// Hard-include: at least one must pass for non-publisher product signals
+// Hard-include: at least one must pass for non-publisher product signals.
 const IN_NICHE_INCLUDE: RegExp[] = [
   // Core baby (0-24 months)
   /\bbaby|newborn|infant|toddler|diaper|stroller|crib|bassinet|swaddle|formula|breast\s*pump|baby\s*food|baby\s*gear|baby\s*monitor|car\s*seat|baby\s*carrier\b/i,
@@ -494,6 +518,14 @@ const IN_NICHE_INCLUDE: RegExp[] = [
   /\bpreschool|toddler\s*food|toddler\s*sleep|toddler\s*gear|early\s*childhood|sensory\s*play|early\s*learning\b/i,
   // Breastfeeding & nutrition
   /\bbreastfeed|lactation|nursing\s*pad|bottle\s*feeding|wean\b/i,
+  // Adoption / foster / LGBTQ+ family
+  /\badoptive\s*parent|foster\s*(family|parent|child)|lgbtq\+?\s*family|rainbow\s*family|two\s*mom|two\s*dad\b/i,
+  // Grandparent gifting angle
+  /\bgrandparent\s*gift|baby\s*shower\s*gift|new\s*grandparent|gifting\s*for\s*baby\b/i,
+  // Expectant/new dad products
+  /\bdad\s*bag|diaper\s*bag\s*for\s*dad|baby\s*carrier.{0,20}men|dad\s*carrier\b/i,
+  // Nursery / sleep setup
+  /\bnursery\s*(furniture|décor|setup|design)|sleep\s*(sack|train|safe)|baby\s*mattress\b/i,
 ]
 
 /**
@@ -530,19 +562,41 @@ function nicheFilter(
 
 // ─── Brand upsert ─────────────────────────────────────────────────────────────
 
+interface BrandUpsertExtras {
+  founderAttributes?: {
+    mom_founded?: boolean
+    women_founded?: boolean
+    bipoc_founded?: boolean
+    lgbtq_focused?: boolean
+    adoption_focused?: boolean
+  }
+  discoverySource?: 'rss' | 'watchlist' | 'retailer' | 'funding' | 'social' | 'curated' | 'job_posting' | 'founder_tracking' | 'manual'
+  sourceName?: string
+}
+
 async function upsertBrand(
   tenantId: string,
   extraction: HaikuExtraction,
   fitScore: number,
   brandKind: 'brand' | 'publisher' | 'creator' = 'brand',
+  extras?: BrandUpsertExtras,
 ): Promise<{ id: string; created: boolean }> {
   const query = extraction.brand_domain
-    ? supabase.from('brands').select('id, status').eq('tenant_id', tenantId).eq('domain', extraction.brand_domain).maybeSingle()
-    : supabase.from('brands').select('id, status').eq('tenant_id', tenantId).ilike('brand_name', extraction.brand_name).maybeSingle()
+    ? supabase.from('brands').select('id, status, sources, founder_attributes').eq('tenant_id', tenantId).eq('domain', extraction.brand_domain).maybeSingle()
+    : supabase.from('brands').select('id, status, sources, founder_attributes').eq('tenant_id', tenantId).ilike('brand_name', extraction.brand_name).maybeSingle()
 
   const { data: existing } = await query
 
   if (existing) {
+    // Merge sources array — add this source if not already present
+    const existingSources: string[] = Array.isArray((existing as any).sources) ? (existing as any).sources : []
+    const newSource = extras?.sourceName ?? 'rss'
+    const mergedSources = existingSources.includes(newSource) ? existingSources : [...existingSources, newSource]
+
+    // Merge founder_attributes — backfill if missing, never overwrite existing
+    const existingAttrs = (existing as any).founder_attributes
+    const attrs = existingAttrs ?? extras?.founderAttributes ?? null
+
     await supabase
       .from('brands')
       .update({
@@ -550,6 +604,8 @@ async function upsertBrand(
         fit_score: fitScore,
         brand_kind: brandKind,
         status: (existing as any).status === 'new' ? 'scoring' : (existing as any).status,
+        sources: mergedSources,
+        ...(attrs && !existingAttrs ? { founder_attributes: attrs } : {}),
       })
       .eq('id', existing.id)
     return { id: existing.id, created: false }
@@ -558,16 +614,19 @@ async function upsertBrand(
   const { data: created, error } = await supabase
     .from('brands')
     .insert({
-      tenant_id: tenantId,
-      brand_name: extraction.brand_name,
-      domain: extraction.brand_domain,
-      categories: [],
-      fit_score: fitScore,
-      brand_kind: brandKind,
-      status: fitScore >= 75 ? 'scoring' : 'new',
-      last_signal_at: new Date().toISOString(),
-      conflict_flag: { is_competitor_of: [], blocked_until: null },
-      voice_samples: [],
+      tenant_id:          tenantId,
+      brand_name:         extraction.brand_name,
+      domain:             extraction.brand_domain,
+      categories:         [],
+      fit_score:          fitScore,
+      brand_kind:         brandKind,
+      status:             fitScore >= 75 ? 'scoring' : 'new',
+      last_signal_at:     new Date().toISOString(),
+      conflict_flag:      { is_competitor_of: [], blocked_until: null },
+      voice_samples:      [],
+      founder_attributes: extras?.founderAttributes ?? null,
+      discovery_source:   extras?.discoverySource ?? 'rss',
+      sources:            [extras?.sourceName ?? 'rss'],
     })
     .select('id')
     .single()
@@ -594,6 +653,7 @@ export async function run(tenantId: string): Promise<ScanResult> {
   const [
     pressWire, funding, celebs,
     brandLaunches, fundedBrands, retailSignals, smallBrands,
+    watchlist, curatedLists, jobSignals,
     celebBabies, nameTrends, parentingCulture,
   ] = await Promise.all([
     fetchPressWire(),
@@ -603,6 +663,13 @@ export async function run(tenantId: string): Promise<ScanResult> {
     fetchFundedBrands(),
     fetchRetailSignals(),
     fetchSmallBrands(),
+    // Phase 1: Watchlist (knownBrand → bypasses Haiku)
+    fetchWatchlist(),
+    // Phase 5: Curated lists (Haiku + curated boost)
+    fetchCuratedLists(),
+    // Phase 6: Job / hiring signals (Haiku → hiring_signal type → +15 boost)
+    fetchJobSignals(),
+    // Channel B: Content radar (bypass all scoring)
     fetchCelebBabies(),
     fetchNameTrends(),
     fetchParentingCulture(),
@@ -610,6 +677,7 @@ export async function run(tenantId: string): Promise<ScanResult> {
   const allRaw = [
     ...pressWire, ...funding, ...celebs,
     ...brandLaunches, ...fundedBrands, ...retailSignals, ...smallBrands,
+    ...watchlist, ...curatedLists, ...jobSignals,
     ...celebBabies, ...nameTrends, ...parentingCulture,
   ]
 
@@ -622,6 +690,9 @@ export async function run(tenantId: string): Promise<ScanResult> {
     `  fundedBrands=${fundedBrands.length}`,
     `  retailSignals=${retailSignals.length}`,
     `  smallBrands=${smallBrands.length}`,
+    `  watchlist=${watchlist.length}`,
+    `  curatedLists=${curatedLists.length}`,
+    `  jobSignals=${jobSignals.length}`,
     `  celebBabies=${celebBabies.length}`,
     `  nameTrends=${nameTrends.length}`,
     `  parentingCulture=${parentingCulture.length}`,
@@ -704,7 +775,25 @@ export async function run(tenantId: string): Promise<ScanResult> {
 
       const knownPublisher = detectMediaPublisher(raw.source, raw.url)
 
-      if (knownPublisher) {
+      if (raw.knownBrand) {
+        // ── Known-brand bypass (watchlist / curated) ──────────────────────
+        // Pre-validated brands — we trust the brand data, skip Haiku entirely.
+        // Signals will still go through niche filter, dedupe, and brand upsert.
+        extraction = {
+          brand_name:           raw.knownBrand.name,
+          brand_domain:         raw.knownBrand.domain,
+          signal_type:          raw.knownBrand.isHiringCreators ? 'hiring_signal' : 'product_launch',
+          category_fit:         raw.knownBrand.categoryFit,
+          audience_overlap:     85,  // pre-validated brands = high audience overlap
+          is_publisher_or_creator: false,
+          skip:                 false,
+          skip_reason:          '',
+        }
+        extractionPath = {
+          path: 'known_brand',
+          discoverySource: raw.knownBrand.discoverySource ?? 'watchlist',
+        }
+      } else if (knownPublisher) {
         // Publisher override — no Haiku call needed
         extraction = buildMediaOpportunityExtraction(knownPublisher)
         extractionPath = { path: 'publisher_override', publisher: knownPublisher.displayName }
@@ -771,13 +860,15 @@ export async function run(tenantId: string): Promise<ScanResult> {
         pastCreatorTierScore: 50,
       })
 
-      // ── Channel-specific score boosts ─────────────────────────────────────
-      // Applied after base fit score so they don't distort the formula weights.
-      // Use raw.channel here (not funnel) because funnel is derived below.
+      // ── Score boosts — applied after base score ────────────────────────────
+      // Each boost is independent and capped at 100.
       let fitScore = baseFitScore
+
+      // Channel boost: brand_deal signals have higher monetization potential
       if (raw.channel === 'brand_deal') {
-        fitScore = Math.min(100, fitScore + 10)   // monetizable brand deal: +10
-        // Funding signal keywords in the headline: extra +5 (total +15 vs base)
+        fitScore = Math.min(100, fitScore + 10)
+
+        // Funding keyword in headline: extra +5 (total +15 vs base)
         const headlineLower = raw.headline.toLowerCase()
         if (
           headlineLower.includes('raises') || headlineLower.includes('series') ||
@@ -785,6 +876,24 @@ export async function run(tenantId: string): Promise<ScanResult> {
         ) {
           fitScore = Math.min(100, fitScore + 5)
         }
+      }
+
+      // Founder attribute boosts (from watchlist knownBrand or Haiku metadata)
+      const fa = raw.knownBrand?.founderAttributes
+      if (fa?.mom_founded)       fitScore = Math.min(100, fitScore + 10)  // strongest signal: built by a mom
+      if (fa?.women_founded)     fitScore = Math.min(100, fitScore + 5)
+      if (fa?.bipoc_founded)     fitScore = Math.min(100, fitScore + 5)
+      if (fa?.lgbtq_focused)     fitScore = Math.min(100, fitScore + 5)
+      if (fa?.adoption_focused)  fitScore = Math.min(100, fitScore + 8)   // Taylor's audience cares deeply
+
+      // Curated pick boost: brand appeared in an editor-vetted list or award
+      if (raw.knownBrand?.isCuratedPick || CURATED_SOURCE_NAMES.some(cs => raw.source.includes(cs))) {
+        fitScore = Math.min(100, fitScore + 5)
+      }
+
+      // Hiring creators boost: brand is actively building a creator program → pitch NOW
+      if (extraction.signal_type === 'hiring_signal') {
+        fitScore = Math.min(100, fitScore + 15)
       }
 
       const THRESHOLD = 40
@@ -853,8 +962,19 @@ export async function run(tenantId: string): Promise<ScanResult> {
       let brandId: string | null = null
       let brandCreated = false
 
+      // Derive discovery_source from the extraction path
+      const discoverySource: BrandUpsertExtras['discoverySource'] =
+        extractionPath.path === 'known_brand'
+          ? (raw.knownBrand?.discoverySource ?? 'watchlist')
+          : raw.channel === 'brand_deal' ? 'rss'
+          : 'rss'
+
       try {
-        const result = await upsertBrand(tenantId, extraction, fitScore, brandKind)
+        const result = await upsertBrand(tenantId, extraction, fitScore, brandKind, {
+          founderAttributes: raw.knownBrand?.founderAttributes,
+          discoverySource,
+          sourceName: raw.source,
+        })
         brandId = result.id
         brandCreated = result.created
         if (result.created) stats.brandsCreated++

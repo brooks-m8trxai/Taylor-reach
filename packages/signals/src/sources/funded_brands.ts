@@ -41,6 +41,7 @@ function isFundedBrandSignal(text: string): boolean {
 }
 
 const SOURCES = [
+  // ── Broad business / tech coverage ────────────────────────────────────────
   {
     // Business news — catches funding rounds not covered by Crunchbase News
     name: 'VentureBeat',
@@ -78,6 +79,47 @@ const SOURCES = [
     name: 'Fortune',
     url: 'https://fortune.com/feed/',
     maxAgeDays: 14,
+  },
+
+  // ── Phase 3: Funding-specific + VC newsletters ────────────────────────────
+  {
+    // Axios Pro Rata — daily VC/PE deal coverage; first to break many rounds
+    name: 'Axios Pro Rata',
+    url: 'https://www.axios.com/feeds/feed.rss',
+    maxAgeDays: 7,
+  },
+  {
+    // StrictlyVC — newsletter turned RSS; covers seed + Series A consumer brands
+    name: 'StrictlyVC',
+    url: 'https://strictlyvc.com/feed/',
+    maxAgeDays: 14,
+  },
+  {
+    // Crunchbase News — comprehensive funding coverage; complement to crunchbase_news.ts
+    name: 'Crunchbase News',
+    url: 'https://news.crunchbase.com/feed/',
+    maxAgeDays: 7,
+  },
+  {
+    // TechCrunch startups — catches DTC and consumer brand rounds
+    name: 'TechCrunch Startups',
+    url: 'https://techcrunch.com/category/startups/feed/',
+    maxAgeDays: 7,
+  },
+  {
+    // GlobeNewswire consumer — press releases from smaller DTC brands announcing rounds
+    name: 'GlobeNewswire Consumer',
+    url: 'https://www.globenewswire.com/RssFeed/subjectcode/25-Consumer+Products',
+    maxAgeDays: 7,
+  },
+  {
+    // Forerunner Ventures news — parent-tech/consumer VC; their portfolio = Taylor's targets
+    // NOTE: no RSS available; we catch their portfolio brands via press wire instead
+    // Forerunner portfolio brands to watch: Hims, Ritual, Curology, Oura, Away...
+    // Many of their consumer portfolio companies serve new parents.
+    name: 'Business Wire',  // fallback — Forerunner portfolio companies use Business Wire
+    url: 'https://feed.businesswire.com/rss/home/?rss=G7&rssid=20',
+    maxAgeDays: 7,
   },
 ]
 

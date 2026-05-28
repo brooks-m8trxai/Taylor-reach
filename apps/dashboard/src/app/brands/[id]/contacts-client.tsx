@@ -12,6 +12,8 @@ const BADGE_CONFIG: Record<string, { label: string; classes: string }> = {
   role_based:  { label: 'Role-based',  classes: 'bg-amber-950 text-amber-300' },
   generic:     { label: 'Generic',     classes: 'bg-zinc-800 text-zinc-500' },
   unverified:  { label: 'Unverified',  classes: 'bg-zinc-900 text-zinc-600' },
+  risky:       { label: 'Risky',       classes: 'bg-orange-950 text-orange-400' },
+  invalid:     { label: 'Invalid',     classes: 'bg-red-950 text-red-500 line-through' },
 }
 
 type Contact = {
@@ -24,6 +26,8 @@ type Contact = {
   quality_badge: string | null
   badge_reason: string | null
   last_verified_at: string | null
+  email_status: string | null
+  confidence: number | null
 }
 
 // ─── Verify button ────────────────────────────────────────────────────────────
@@ -118,6 +122,11 @@ function ContactCard({ contact, brandId }: { contact: Contact; brandId: string }
         <div className="text-xs text-zinc-400">{contact.email}</div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-zinc-700">{contact.source ?? 'unknown'}</span>
+          {contact.confidence != null && (
+            <span className="text-[10px] text-zinc-600" title="Hunter confidence score">
+              {contact.confidence}%
+            </span>
+          )}
           {!verified && contact.email && (
             <VerifyButton contactId={contact.id} brandId={brandId} onVerified={setVerified} />
           )}

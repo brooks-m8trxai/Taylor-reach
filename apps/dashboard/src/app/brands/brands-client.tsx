@@ -42,6 +42,11 @@ type Brand = {
   budget_signal_score: number | null
   brand_kind: string | null
   size_band: string | null
+  // Contact summary — added by page.tsx server query
+  verified_count: number
+  named_count:    number
+  has_contacts:   boolean
+  top_contact:    { name: string | null; email: string } | null
 }
 
 // ─── Category filter tabs ─────────────────────────────────────────────────────
@@ -53,6 +58,71 @@ const CATEGORY_TABS: { value: string; label: string }[] = [
   { value: 'small',     label: 'Small & emerging' },
   { value: 'highfit',   label: 'High fit (75+)' },
 ]
+
+// ─── Contact status badge ─────────────────────────────────────────────────────
+// Priority order: verified > named > generic > none
+// Tooltip shows top contact name + email on hover.
+
+function ContactBadge({
+  verified_count,
+  named_count,
+  has_contacts,
+  top_contact,
+}: {
+  verified_count: number
+  named_count:    number
+  has_contacts:   boolean
+  top_contact:    { name: string | null; email: string } | null
+}) {
+  let label: string
+  let cls: string
+  let tooltipText: string | null = null
+
+  if (verified_count > 0) {
+    label = `✓ ${verified_count} verified`
+    cls = 'border-green-800 bg-green-950 text-green-400'
+    if (top_contact) {
+      tooltipText = top_contact.name
+        ? `${top_contact.name} · ${top_contact.email}`
+        : top_contact.email
+    } else {
+      tooltipText = `${verified_count} verified contact${verified_count !== 1 ? 's' : ''}`
+    }
+  } else if (named_count > 0) {
+    label = `● ${named_count} named`
+    cls = 'border-blue-900 bg-blue-950 text-blue-400'
+    if (top_contact) {
+      tooltipText = top_contact.name
+        ? `${top_contact.name} · ${top_contact.email}`
+        : top_contact.email
+    } else {
+      tooltipText = `${named_count} named contact${named_count !== 1 ? 's' : ''}`
+    }
+  } else if (has_contacts) {
+    label = '○ generic only'
+    cls = 'border-zinc-700 bg-zinc-900 text-zinc-500'
+    tooltipText = 'Only generic emails found (info@, hello@, etc.)'
+  } else {
+    label = '—'
+    cls = 'border-transparent text-zinc-700'
+    tooltipText = null
+  }
+
+  return (
+    <span className="group/badge relative">
+      <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs ${cls}`}>
+        {label}
+      </span>
+      {tooltipText && (
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-200 opacity-0 shadow-lg transition-opacity group-hover/badge:opacity-100">
+          {tooltipText}
+          {/* Downward arrow */}
+          <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-zinc-800" />
+        </span>
+      )}
+    </span>
+  )
+}
 
 // ─── Per-card pitch state ─────────────────────────────────────────────────────
 
@@ -122,12 +192,13 @@ function PitchButton({ brandId, brandName }: { brandId: string; brandName: strin
 type ReEnrichState = 'idle' | 'running' | 'done' | 'error'
 
 export function BrandsClient({ brands }: { brands: Brand[] }) {
-  const [category, setCategory] = useState('all')
-  const [q, setQ] = useState('')
-  const [status, setStatus] = useState('all')
-  const [minFit, setMinFit] = useState(0)
+  const [category, setCategory]         = useState('all')
+  const [q, setQ]                       = useState('')
+  const [status, setStatus]             = useState('all')
+  const [minFit, setMinFit]             = useState(0)
+  const [onlyVerified, setOnlyVerified] = useState(false)
   const [reEnrichState, setReEnrichState] = useState<ReEnrichState>('idle')
-  const [reEnrichMsg, setReEnrichMsg] = useState('')
+  const [reEnrichMsg, setReEnrichMsg]     = useState('')
 
   async function runReEnrich() {
     if (reEnrichState === 'running') return
@@ -154,12 +225,14 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
   }
 
   const filtered = useMemo(() => {
-    return brands.filter(b => {
+    const base = brands.filter(b => {
       // Category tab filter
       if (category === 'brand'     && b.brand_kind === 'publisher') return false
       if (category === 'publisher' && b.brand_kind !== 'publisher') return false
       if (category === 'small'     && !['startup', 'small'].includes(b.size_band ?? '')) return false
       if (category === 'highfit'   && (b.fit_score ?? 0) < 75) return false
+      // Verified-only toggle — Taylor's "ready to pitch right now" view
+      if (onlyVerified && b.verified_count === 0) return false
       // Search
       if (q && !b.brand_name.toLowerCase().includes(q.toLowerCase()) && !b.domain?.includes(q.toLowerCase())) return false
       // Status filter
@@ -168,7 +241,19 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
       if (minFit > 0 && (b.fit_score ?? 0) < minFit) return false
       return true
     })
-  }, [brands, category, q, status, minFit])
+
+    // High-fit tab: secondary sort by verified_count DESC so ready-to-pitch
+    // brands surface above equally-scored but un-enriched brands.
+    if (category === 'highfit') {
+      return [...base].sort((a, b) => {
+        const fitDiff = (b.fit_score ?? 0) - (a.fit_score ?? 0)
+        if (fitDiff !== 0) return fitDiff
+        return b.verified_count - a.verified_count
+      })
+    }
+
+    return base
+  }, [brands, category, q, status, minFit, onlyVerified])
 
   // Counts for category tabs
   const categoryCounts = useMemo(() => ({
@@ -178,6 +263,12 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
     small:     brands.filter(b => ['startup', 'small'].includes(b.size_band ?? '')).length,
     highfit:   brands.filter(b => (b.fit_score ?? 0) >= 75).length,
   }), [brands])
+
+  // Count of brands with verified contacts — shown next to the toggle
+  const verifiedCount = useMemo(
+    () => brands.filter(b => b.verified_count > 0).length,
+    [brands],
+  )
 
   return (
     <div className="space-y-5">
@@ -230,7 +321,7 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
         ))}
       </div>
 
-      {/* ── Search + status + fit filters ────────────────────────────────── */}
+      {/* ── Search + status + fit + verified-only filters ─────────────────── */}
       <div className="flex flex-wrap gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
@@ -258,6 +349,23 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
           <option value={75}>75+ (auto-draft)</option>
           <option value={90}>90+ (priority)</option>
         </select>
+        {/* "Ready to pitch" toggle — filters to brands with verified contacts only */}
+        <button
+          onClick={() => setOnlyVerified(v => !v)}
+          className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+            onlyVerified
+              ? 'border-green-700 bg-green-950 text-green-400'
+              : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+          }`}
+          title="Show only brands with a verified, deliverable email on file"
+        >
+          ✓ Has verified contacts
+          <span className={`rounded px-1 text-[10px] ${
+            onlyVerified ? 'bg-green-900/60 text-green-300' : 'bg-zinc-800 text-zinc-600'
+          }`}>
+            {verifiedCount}
+          </span>
+        </button>
       </div>
 
       <div className="space-y-2">
@@ -284,6 +392,13 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
                 {b.fit_score != null && (
                   <span className="w-16 text-right text-xs text-zinc-400">Fit {b.fit_score}</span>
                 )}
+                {/* Contact status badge — verified > named > generic > none */}
+                <ContactBadge
+                  verified_count={b.verified_count}
+                  named_count={b.named_count}
+                  has_contacts={b.has_contacts}
+                  top_contact={b.top_contact}
+                />
                 <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_BADGE[b.status] ?? 'bg-zinc-800 text-zinc-400'}`}>
                   {b.status.replace(/_/g, ' ')}
                 </span>
@@ -299,7 +414,9 @@ export function BrandsClient({ brands }: { brands: Brand[] }) {
         ))}
         {filtered.length === 0 && (
           <div className="rounded-md border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-500">
-            No brands match your filters. Run the scanner to populate the library.
+            {onlyVerified
+              ? 'No brands with verified contacts yet. Run the Hunter enrichment batch to add contacts.'
+              : 'No brands match your filters. Run the scanner to populate the library.'}
           </div>
         )}
       </div>

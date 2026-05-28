@@ -25,6 +25,31 @@ export interface RawSignal {
    * Omit for legacy sources (scanner will derive from extraction path).
    */
   channel?: 'brand_deal' | 'media_opportunity' | 'content_radar'
+
+  /**
+   * Pre-populated brand metadata from a curated watchlist or award list.
+   * When present, the scanner skips Haiku entirely — we trust the brand data.
+   * Enables fit score boosts for founder attributes and curated picks.
+   */
+  knownBrand?: {
+    name: string
+    domain: string | null
+    /** Haiku-equivalent category_fit — pre-scored because we know the brand */
+    categoryFit: number
+    founderAttributes?: {
+      mom_founded?: boolean
+      women_founded?: boolean
+      bipoc_founded?: boolean
+      lgbtq_focused?: boolean
+      adoption_focused?: boolean
+    }
+    /** How this brand was discovered — written to brands.discovery_source */
+    discoverySource?: 'watchlist' | 'curated' | 'retailer' | 'job_posting'
+    /** Brand appears on a curated award list → +5 fit score boost */
+    isCuratedPick?: boolean
+    /** Brand is actively hiring influencer/creator marketing roles → +15 boost */
+    isHiringCreators?: boolean
+  }
 }
 
 const BABY_KEYWORDS = [

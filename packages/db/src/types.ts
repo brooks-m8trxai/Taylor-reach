@@ -163,6 +163,19 @@ export interface Brand {
   opportunity_summary: string | null
   suggested_angles_json: Json | null
   intelligence_generated_at: string | null
+  /** Founder metadata — drives fit score boosts and diversity surfacing */
+  founder_attributes: {
+    mom_founded?: boolean
+    women_founded?: boolean
+    bipoc_founded?: boolean
+    lgbtq_focused?: boolean
+    adoption_focused?: boolean
+    founder_names?: string[]
+  } | null
+  /** Which channel first surfaced this brand */
+  discovery_source: 'rss' | 'watchlist' | 'retailer' | 'funding' | 'social' | 'curated' | 'job_posting' | 'founder_tracking' | 'manual' | null
+  /** All discovery sources seen — enables cross-source validation boost */
+  sources: string[]
   created_at: string
   updated_at: string
 }
@@ -177,6 +190,13 @@ export interface BrandContact {
   role_priority: number | null
   source: string | null
   verified: boolean
+  quality_badge: 'named' | 'editorial' | 'founder' | 'role_based' | 'generic' | 'unverified' | 'risky' | 'invalid' | null
+  badge_reason: string | null
+  last_verified_at: string | null
+  /** Hunter.io SMTP deliverability verdict */
+  email_status: 'deliverable' | 'undeliverable' | 'risky' | 'unknown' | 'accept_all' | null
+  /** Hunter.io confidence score 0–100 */
+  confidence: number | null
   created_at: string
 }
 

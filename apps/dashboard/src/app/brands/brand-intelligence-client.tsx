@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sparkles, Loader2, RefreshCw, Zap, CheckCircle2, AlertCircle, ChevronRight, Database } from 'lucide-react'
 import Link from 'next/link'
 
@@ -169,6 +170,7 @@ export function BrandIntelligenceClient({
   isStale,
   needsEnrichment,
 }: Props) {
+  const router = useRouter()
   const [about, setAbout] = useState(cachedAbout)
   const [opportunity, setOpportunity] = useState(cachedOpportunity)
   const [angles, setAngles] = useState<Angles | null>(
@@ -222,6 +224,10 @@ export function BrandIntelligenceClient({
       return
     }
     setEnriching(false)
+    // Re-run the server component so ContactsClient gets fresh data from DB
+    // (router.refresh() is non-blocking — it updates in the background while
+    //  fetchIntelligence() continues; no full page reload, client state is preserved)
+    router.refresh()
     // Now run intelligence with the fresh enriched data
     await fetchIntelligence()
   }

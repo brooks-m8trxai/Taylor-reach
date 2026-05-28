@@ -5,20 +5,30 @@
  *   - Description, categories, founded year, HQ
  *   - IG/TikTok handles
  *   - Budget signals (careers page, press mentions of ad spend)
- *   - Primary contact email (from /contact page or site footer)
+ *   - Contact emails from homepage, footer, partnership-specific pages
  *   - about_summary: 2-3 sentence plain-prose brand description (for UI display)
  *
- * If no domain is on file, falls back to a hardcoded list of known publishers
- * (inline copy here to avoid a circular dep with @taylor-reach/signals).
+ * Contact discovery order:
+ *   1. Homepage — mailto: links + footer + partnership anchor text
+ *   2. Partnership-focused pages (parallel) — /partnerships, /influencers, etc.
+ *   3. General info pages — /about, /team
+ *   4. Apollo.io — org lookup → named contacts with verified emails
+ *   5. Hunter.io — domain search for personal emails (with SMTP verification)
  *
- * If APOLLO_API_KEY is set, also queries Apollo for verified contact data.
- * Updates the brand row + inserts brand_contacts.
+ * If no domain is on file, falls back to a hardcoded list of known publishers.
  */
 
 import * as cheerio from 'cheerio'
 import Anthropic from '@anthropic-ai/sdk'
 import { supabase } from '@taylor-reach/db'
-import { apolloFindContacts, apolloTitlePriority } from '@taylor-reach/integrations'
+import {
+  apolloFindContacts,
+  apolloTitlePriority,
+  apolloSearchOrganization,
+  hunterDomainSearch,
+  hunterEmailVerifier,
+  hunterAccountInfo,
+} from '@taylor-reach/integrations'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -124,6 +134,55 @@ function extractTextEmails(text: string): string[] {
   return [...new Set(matches.map(e => e.toLowerCase()))]
 }
 
+/**
+ * Extracts emails specifically from the <footer> element.
+ * DTC brands often hide their PR/press email in footer links labelled
+ * "Press" or "Media" — these get stripped out of rawText by the scraper
+ * before analysis, so we need a dedicated footer pass.
+ */
+function extractFooterEmails(html: string): string[] {
+  const $ = cheerio.load(html)
+  const footerMailto = extractMailtoEmails($.html($('footer')) ?? '')
+  const footerText   = $('footer').text().replace(/\s+/g, ' ')
+  return filterUsableEmails([...footerMailto, ...extractTextEmails(footerText)])
+}
+
+/**
+ * Scans homepage anchor tags for links whose visible text suggests a
+ * partnership / press page. Returns internal paths ("/partnerships", etc.)
+ * so the enricher can fetch those pages in a targeted second pass.
+ *
+ * Also returns any mailto: emails directly found in those anchors.
+ */
+const PARTNERSHIP_LINK_KEYWORDS = [
+  'partnership', 'partnerships', 'collaborate', 'collaboration',
+  'press inquiries', 'press inquiry', 'media kit', 'influencer',
+  'creator', 'work with us', 'affiliate', 'wholesale',
+]
+
+function findPartnershipAnchors(html: string): { paths: string[]; emails: string[] } {
+  const $ = cheerio.load(html)
+  const paths: string[] = []
+  const emails: string[] = []
+
+  $('a[href]').each((_, el) => {
+    const text = $(el).text().toLowerCase().trim()
+    const href = $(el).attr('href') ?? ''
+
+    if (!PARTNERSHIP_LINK_KEYWORDS.some(kw => text.includes(kw))) return
+
+    if (href.startsWith('mailto:')) {
+      const email = href.replace(/^mailto:/i, '').split('?')[0].trim().toLowerCase()
+      if (email.includes('@')) emails.push(email)
+    } else if (href.startsWith('/') && !href.startsWith('//')) {
+      // Internal path — add to list for scraping
+      paths.push(href.split('?')[0].split('#')[0])  // strip query/fragment
+    }
+  })
+
+  return { paths: [...new Set(paths)], emails: filterUsableEmails([...new Set(emails)]) }
+}
+
 /** Remove clearly junk emails (noreply, bounce, tracking pixels, etc.) */
 function filterUsableEmails(emails: string[]): string[] {
   const JUNK_PREFIXES = [
@@ -192,6 +251,8 @@ interface ScrapedSite {
   mailtoEmails: string[]
   hasCareerPage: boolean
   rawText: string
+  /** Raw HTML of the homepage — kept for footer + partnership anchor analysis */
+  homepageHtml: string
   /** Kept for backward compat — same as metaDesc */
   description: string
 }
@@ -253,6 +314,7 @@ function scrapeWebsite(html: string, domain: string): ScrapedSite {
     mailtoEmails,
     hasCareerPage,
     rawText,
+    homepageHtml: html,   // kept for footer + partnership-anchor analysis
   }
 }
 
@@ -438,6 +500,18 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
     console.log(`[enricher] ${brandName}: no domain found, using hardcoded description`)
   }
 
+  // ── Apollo org lookup — fills in gaps scraping couldn't get ─────────────
+  // Skipped when APOLLO_DISABLED=true (env var) — set this when Apollo is
+  // 422-ing on DTC brands and you want Hunter to carry the full load.
+  // apolloSearchOrganization caches results in-memory, so repeat enrichments
+  // cost 0 extra credits after the first run.
+  let apolloOrg = null
+  if (domain && !process.env.APOLLO_DISABLED) {
+    apolloOrg = await apolloSearchOrganization(domain, '[enricher]')
+  } else if (process.env.APOLLO_DISABLED) {
+    console.log(`[enricher] Apollo disabled via APOLLO_DISABLED — skipping org lookup`)
+  }
+
   // ── Compute scores ────────────────────────────────────────────────────────
   const budgetScore = haikuData?.budget_signal_score ?? (scraped?.hasCareerPage ? 40 : 30)
   const categoryFitEst = (brand as any).fit_score ?? 60
@@ -466,11 +540,35 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
 
   if (haikuData?.description)          updatePayload.description = haikuData.description
   if (haikuData?.categories?.length)   updatePayload.categories = haikuData.categories
-  if (haikuData?.founded_year)         updatePayload.founded_year = haikuData.founded_year
-  if (haikuData?.hq_city)             updatePayload.hq_city = haikuData.hq_city
-  if (haikuData?.hq_country)          updatePayload.hq_country = haikuData.hq_country
   if (scraped?.igHandle)              updatePayload.ig_handle = `@${scraped.igHandle}`
   if (scraped?.tiktokHandle)          updatePayload.tiktok_handle = `@${scraped.tiktokHandle}`
+
+  // Apollo org data fills in fields scraping couldn't get
+  // (Haiku wins when it extracts something; Apollo is the fallback)
+  if (!updatePayload.founded_year && apolloOrg?.founded_year)
+    updatePayload.founded_year = apolloOrg.founded_year
+  else if (haikuData?.founded_year)
+    updatePayload.founded_year = haikuData.founded_year
+
+  if (!updatePayload.hq_city && haikuData?.hq_city)
+    updatePayload.hq_city = haikuData.hq_city
+  if (!updatePayload.hq_country && haikuData?.hq_country)
+    updatePayload.hq_country = haikuData.hq_country
+
+  // Apollo employee count → size_band if Haiku didn't classify it
+  if (!updatePayload.size_band && apolloOrg?.estimated_num_employees != null) {
+    const emp = apolloOrg.estimated_num_employees
+    updatePayload.size_band =
+      emp < 10  ? 'startup'
+      : emp < 50  ? 'small'
+      : emp < 250 ? 'mid'
+      : emp < 1000 ? 'large'
+      : 'enterprise'
+    console.log(`[enricher] Apollo employee count (${emp}) → size_band=${updatePayload.size_band}`)
+  }
+
+  // LinkedIn URL from Apollo (useful for prospecting)
+  if (apolloOrg?.linkedin_url) updatePayload.linkedin_url = apolloOrg.linkedin_url
 
   // Write about_summary so the intelligence panel can display it immediately
   if (aboutSummary) updatePayload.about_summary = aboutSummary
@@ -490,7 +588,7 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
   console.log(`[enricher/contacts] ── Starting contact discovery for ${brandName} ──`)
   console.log(`[enricher/contacts] brand_id=${brandId}  domain=${domain ?? 'none'}`)
 
-  // Collect all emails from every available page
+  // Collect all emails from every available source
   const emailSet = new Set<string>()
 
   // Source 1: mailto: links from homepage scrape
@@ -501,32 +599,83 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
     console.log(`[enricher/contacts] Homepage mailto: none`)
   }
 
-  // Source 2: text-embedded emails from homepage
+  // Source 2: text-embedded emails from homepage body
   if (scraped?.contactEmail) {
     console.log(`[enricher/contacts] Homepage text email: ${scraped.contactEmail}`)
     emailSet.add(scraped.contactEmail)
   }
 
-  // Sources 3-6: additional pages likely to have contact info
-  if (domain) {
-    for (const path of ['/contact', '/about', '/team', '/press']) {
-      console.log(`[enricher/contacts] Scraping ${domain}${path}`)
-      const html = await fetchPage(`https://${domain}${path}`)
-      if (!html) { console.log(`[enricher/contacts]   → not found / blocked`); continue }
+  if (domain && scraped?.homepageHtml) {
+    // Source 3: footer emails — DTC brands often put press@ in the footer
+    const footerEmails = extractFooterEmails(scraped.homepageHtml)
+    if (footerEmails.length) {
+      console.log(`[enricher/contacts] Footer emails: ${footerEmails.join(', ')}`)
+      footerEmails.forEach(e => emailSet.add(e))
+    }
 
-      const pageMailto = extractMailtoEmails(html)
-      const $ = cheerio.load(html)
-      const pageText = $('body').text().replace(/\s+/g, ' ').slice(0, 3000)
-      const pageText2 = extractTextEmails(pageText)
-      const combined = filterUsableEmails([...pageMailto, ...pageText2])
-      console.log(`[enricher/contacts]   ${path}: mailto=${pageMailto.join(',') || 'none'} text=${pageText2.join(',') || 'none'}`)
-      combined.forEach(e => emailSet.add(e))
+    // Source 4: partnership-anchor link text detection — follow matched paths
+    const { paths: anchorPaths, emails: anchorEmails } = findPartnershipAnchors(scraped.homepageHtml)
+    anchorEmails.forEach(e => emailSet.add(e))
+    if (anchorPaths.length) {
+      console.log(`[enricher/contacts] Partnership anchors found: ${anchorPaths.join(', ')}`)
+    }
+
+    // Source 5: targeted pages — partnership-specific + general info pages.
+    // Runs in parallel batches: partnership pages first (high probability for
+    // DTC mom brands), then general info pages.
+    //
+    // Partnership pages: /partnerships /influencers /creators /collaborate
+    //   /work-with-us /affiliate /press-room /wholesale /media /news
+    //   + any additional paths found via anchor-text detection above.
+    // General pages:  /about /team (kept — often have team email addresses)
+    // Always check:   /contact /press (most brands have one of these)
+    const PARTNERSHIP_PATHS = [
+      '/partnerships', '/influencers', '/creators', '/collaborate',
+      '/work-with-us', '/affiliate', '/press-room', '/wholesale',
+      '/media', '/news',
+    ]
+    const GENERAL_PATHS = ['/contact', '/press', '/about', '/team']
+
+    // Merge anchor-detected paths + known lists, dedup, exclude homepage
+    const allPaths = [...new Set([
+      ...PARTNERSHIP_PATHS,
+      ...anchorPaths.filter(p => p.length > 1 && p !== '/'),
+      ...GENERAL_PATHS,
+    ])]
+
+    console.log(`[enricher/contacts] Scraping ${allPaths.length} pages in parallel (6s timeout each)`)
+
+    // Parallel fetch — all pages at once, shorter timeout than homepage
+    const pageResults = await Promise.allSettled(
+      allPaths.map(async path => {
+        const html = await fetchPage(`https://${domain}${path}`, 6_000)
+        if (!html) return { path, emails: [] as string[] }
+
+        const pageMailto = extractMailtoEmails(html)
+        const $ = cheerio.load(html)
+        const pageText = $('body').text().replace(/\s+/g, ' ').slice(0, 2000)
+        const textEmails = extractTextEmails(pageText)
+        const footerFromPage = extractFooterEmails(html)
+        const combined = filterUsableEmails([...pageMailto, ...textEmails, ...footerFromPage])
+        return { path, emails: combined }
+      }),
+    )
+
+    let totalPageEmails = 0
+    for (const r of pageResults) {
+      if (r.status === 'fulfilled' && r.value.emails.length) {
+        console.log(`[enricher/contacts]   ${r.value.path}: ${r.value.emails.join(', ')}`)
+        r.value.emails.forEach(e => emailSet.add(e))
+        totalPageEmails += r.value.emails.length
+      }
+    }
+    if (totalPageEmails === 0) {
+      console.log(`[enricher/contacts]   No emails found in any secondary pages`)
     }
   }
 
   const usableEmails = [...emailSet]
-  console.log(`[enricher/contacts] Unique usable emails: ${usableEmails.length > 0 ? usableEmails.join(', ') : 'NONE'}`)
-  console.log(`[enricher/contacts] Apollo key present: ${!!process.env.APOLLO_API_KEY}`)
+  console.log(`[enricher/contacts] Scraped emails (unique): ${usableEmails.length > 0 ? usableEmails.join(', ') : 'NONE'}`)
 
   // Assemble candidate contacts
   type Candidate = {
@@ -537,6 +686,8 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
     linkedinUrl?: string | null
     rolePriority?: number
     emailStatus?: string | null
+    confidence?: number | null
+    hunterResult?: string | null   // 'deliverable' | 'risky' | etc.
   }
   const candidates: Candidate[] = []
 
@@ -544,25 +695,94 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
     candidates.push({ name: null, title: null, email, source: 'website' })
   }
 
-  // Apollo contacts — cross-references LinkedIn to find named partnership contacts
-  if (domain) {
-    const apolloContacts = await apolloFindContacts(domain, {
-      logPrefix: '[enricher/contacts]',
-      perPage: 5,
-    })
-    for (const c of apolloContacts) {
-      if (c.email) {
-        candidates.push({
-          name: c.name ?? null,
-          title: c.title ?? null,
-          email: c.email.toLowerCase(),
-          source: 'apollo',
-          linkedinUrl: c.linkedin_url ?? null,
-          rolePriority: apolloTitlePriority(c.title),
-          emailStatus: c.email_status ?? null,
-        })
+  // ── Apollo contacts ────────────────────────────────────────────────────────
+  // Two-step: org lookup (cached) → people by org_id. Falls back to domain search.
+  // Skip entirely when APOLLO_DISABLED=true — Apollo 422s on most DTC brands
+  // and Hunter covers that gap better.
+  if (domain && !process.env.APOLLO_DISABLED) {
+    console.log(`[enricher/contacts] Apollo: ${process.env.APOLLO_API_KEY ? 'enabled' : 'key not set'}`)
+    if (process.env.APOLLO_API_KEY) {
+      const apolloContacts = await apolloFindContacts(domain, {
+        logPrefix: '[enricher/contacts]',
+        perPage: 5,
+      })
+      for (const c of apolloContacts) {
+        if (c.email) {
+          candidates.push({
+            name: c.name ?? null,
+            title: c.title ?? null,
+            email: c.email.toLowerCase(),
+            source: 'apollo',
+            linkedinUrl: c.linkedin_url ?? null,
+            rolePriority: apolloTitlePriority(c.title),
+            emailStatus: c.email_status ?? null,
+          })
+        }
       }
     }
+  } else if (process.env.APOLLO_DISABLED) {
+    console.log(`[enricher/contacts] Apollo disabled via APOLLO_DISABLED — skipping contact search`)
+  }
+
+  // ── Hunter contacts ────────────────────────────────────────────────────────
+  // Domain search for personal emails (named contacts), followed by SMTP
+  // verification of each result. Hunter's DTC database often covers brands
+  // that Apollo misses.
+  //
+  // Verify cache: keyed by email, lives for the duration of this single
+  // enrichment run. Prevents double-spending credits when the same address
+  // appears from multiple sources (e.g. scraped homepage AND Hunter result).
+  // On a cache hit the stored result is reused as-is — no second API call.
+  if (domain && process.env.HUNTER_API_KEY) {
+    // Log credit balance once per enrichment run so usage is visible
+    await hunterAccountInfo('[enricher/contacts]')
+
+    const hunterEmails = await hunterDomainSearch(domain, {
+      type: 'personal',
+      limit: 5,
+      logPrefix: '[enricher/contacts]',
+    })
+
+    // Per-run verify cache: email → HunterVerifyResult
+    // Keyed by lowercase email. If two sources produce the same address, the
+    // first verification result wins — we deliberately don't call twice.
+    // (Between-run flakiness is handled by the DB dedup check — once a
+    // contact is saved it isn't re-saved, regardless of what Hunter returns
+    // on the next enrichment run.)
+    const runVerifyCache = new Map<string, { result: string; score: number } | null>()
+
+    for (const h of hunterEmails) {
+      const emailKey = h.value.toLowerCase()
+      let verifyResult: string | null = null
+      let verifyScore: number | null = null
+
+      if (runVerifyCache.has(emailKey)) {
+        // Cache hit — reuse previous result, no API call
+        const cached = runVerifyCache.get(emailKey)
+        verifyResult = cached?.result ?? null
+        verifyScore  = cached?.score  ?? null
+        console.log(`[enricher/contacts] verify cache hit: ${emailKey} → ${verifyResult} (score=${verifyScore})`)
+      } else {
+        const verify = await hunterEmailVerifier(emailKey, '[enricher/contacts]')
+        verifyResult = verify?.result ?? null
+        verifyScore  = verify?.score  ?? null
+        // Store even if null so we don't retry a failed call either
+        runVerifyCache.set(emailKey, verify ? { result: verify.result, score: verify.score } : null)
+      }
+
+      candidates.push({
+        name: h.first_name && h.last_name ? `${h.first_name} ${h.last_name}`.trim() : null,
+        title: h.position ?? null,
+        email: emailKey,
+        source: 'hunter',
+        rolePriority: undefined,   // computed below from badge
+        emailStatus: verifyResult,
+        confidence: h.confidence,
+        hunterResult: verifyResult,
+      })
+    }
+  } else if (domain) {
+    console.log(`[enricher/contacts] Hunter key not set — skipping Hunter domain search`)
   }
 
   console.log(`[enricher/contacts] Total candidates to attempt: ${candidates.length}`)
@@ -570,7 +790,7 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
   let contactsFound = 0
 
   for (const c of candidates) {
-    // Dedup check
+    // Dedup check — match on email address regardless of source
     const { data: existing } = await supabase
       .from('brand_contacts')
       .select('id')
@@ -583,10 +803,24 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
       continue
     }
 
-    // Quality badge
-    const { badge, reason } = computeContactQualityBadge(
-      c.email, c.name, c.title, finalBrandKind, finalSizeBand,
-    )
+    // Quality badge — Hunter results use hunter_result to determine badge
+    let badge: string
+    let reason: string
+    if (c.source === 'hunter') {
+      if (c.hunterResult === 'deliverable' && c.confidence != null && c.confidence >= 70) {
+        badge = 'named'; reason = `Hunter personal email, verified deliverable (confidence ${c.confidence})`
+      } else if (c.hunterResult === 'risky' || (c.source === 'hunter' && !c.hunterResult)) {
+        badge = 'risky'; reason = `Hunter email — accept_all server, deliverability unverifiable`
+      } else if (c.hunterResult === 'undeliverable') {
+        badge = 'invalid'; reason = `Hunter returned undeliverable — do not send`
+      } else {
+        badge = 'unverified'; reason = `Hunter email (confidence ${c.confidence ?? '?'}, unverified)`
+      }
+    } else {
+      const computed = computeContactQualityBadge(c.email, c.name, c.title, finalBrandKind, finalSizeBand)
+      badge = computed.badge
+      reason = computed.reason
+    }
 
     const insertPayload: Record<string, unknown> = {
       brand_id: brandId,
@@ -594,20 +828,21 @@ export async function enrich(brandId: string): Promise<EnrichmentResult | null> 
       title: c.title,
       email: c.email,
       source: c.source,
-      // Apollo emails are pre-verified by their data; scraped ones are unverified
-      verified: c.source === 'apollo' && (c.emailStatus === 'verified'),
+      verified: (c.source === 'apollo' && c.emailStatus === 'verified')
+             || (c.source === 'hunter' && c.hunterResult === 'deliverable'),
       quality_badge: badge,
       badge_reason: reason,
-      // Use Apollo's title-priority score if available, else compute from badge
       role_priority: c.rolePriority
         ?? (badge === 'named' || badge === 'founder' ? 1
           : badge === 'role_based' ? 2
           : badge === 'editorial' ? 2
           : badge === 'generic' ? 5
+          : badge === 'invalid' ? 9
           : 3),
     }
-    // Store LinkedIn URL if Apollo provided it
-    if (c.linkedinUrl) insertPayload.linkedin_url = c.linkedinUrl
+    if (c.linkedinUrl)    insertPayload.linkedin_url  = c.linkedinUrl
+    if (c.emailStatus)    insertPayload.email_status  = c.emailStatus
+    if (c.confidence != null) insertPayload.confidence = c.confidence
 
     console.log(`[enricher/contacts] INSERT: email=${c.email} badge=${badge} source=${c.source}`)
     const { error: insertErr } = await supabase.from('brand_contacts').insert(insertPayload)

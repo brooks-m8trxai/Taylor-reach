@@ -43,7 +43,7 @@ export default async function BrandDetailPage({ params }: { params: { id: string
       .limit(20),
     serverClient
       .from('brand_contacts')
-      .select('id, name, title, email, source, verified, quality_badge, badge_reason, last_verified_at')
+      .select('id, name, title, email, source, verified, quality_badge, badge_reason, last_verified_at, email_status, confidence')
       .eq('brand_id', params.id)
       .order('role_priority'),
     serverClient
